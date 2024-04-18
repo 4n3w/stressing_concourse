@@ -1,0 +1,35 @@
+resources:
+  - name: every-{{ trigger_interval }}-minutes
+    type: time
+    source:
+      interval: {{ trigger_interval }}m
+      start: 9:00 AM
+      stop: 6:00 PM
+      days: [Monday, Tuesday, Wednesday, Thursday, Friday]
+      location: America/Toronto
+
+jobs:
+{% for job, details in jobs.items() %}
+  - name: stress-{{ job }}-load
+    plan:
+      - get: every-{{ trigger_interval }}-minutes
+        trigger: true
+      - task: pin-{{ job }}-stress
+        config:
+          platform: linux
+          image_resource:
+            type: registry-image
+            source:
+              repository: 4n3w/stress
+              username: ((registry_username))
+              password: ((registry_token))
+              tag: latest
+          run:
+            path: /bin/sh
+            args:
+              - -c
+              - |
+                stress_time={{ details.duration }}s
+                echo "Stressing {{ job }} for {{ details.duration }} seconds..."
+                stress-ng {{ details.params }} --timeout {{ details.duration }}s --metrics-brief
+{% endfor %}
